@@ -1,0 +1,363 @@
+classDiagram
+    direction TB
+
+    %% ============ Users ============
+    class User {
+        <<abstract>>
+        +UUID id
+        +String name
+        +String email
+        +String phone
+    }
+    class Customer {
+        +VerificationLevel level
+        +AccountStatus status
+        +DateTime registeredAt
+    }
+    class Agent {
+        +String agentCode
+        +AccountStatus status
+    }
+    class SystemAdministrator
+    class SupportEmployee
+
+    User <|-- Customer
+    User <|-- Agent
+    User <|-- SystemAdministrator
+    User <|-- SupportEmployee
+
+    class VerificationLevel {
+        <<enumeration>>
+        Basic
+        Verified
+    }
+    class AccountStatus {
+        <<enumeration>>
+        Active
+        Blocked
+    }
+
+    %% ============ Wallet and Ledger ============
+    class Wallet {
+        +UUID id
+        +Decimal availableBalance
+        +Decimal heldBalance
+        +calculateBalance()
+    }
+    class LedgerEntry {
+        +UUID id
+        +EntryType type
+        +Decimal amount
+        +DateTime createdAt
+        +String reason
+    }
+    class EntryType {
+        <<enumeration>>
+        TopUp
+        Hold
+        Release
+        Charge
+        Refund
+        Commission
+    }
+    class TopUp {
+        +UUID id
+        +Decimal amount
+        +TopUpMethod method
+        +TopUpStatus status
+    }
+    class TopUpMethod {
+        <<enumeration>>
+        SimulatedCard
+        AgentCash
+    }
+
+    Customer "1" --> "1" Wallet : owns
+    Agent "1" --> "1" Wallet : owns agent wallet
+    Wallet "1" --> "0..*" LedgerEntry : derived from
+    Wallet "1" --> "0..*" TopUp : receives
+    TopUp "1" --> "1" LedgerEntry : records
+    TopUp --> TopUpMethod
+    LedgerEntry --> EntryType
+
+    %% ============ Billers and Services ============
+    class Biller {
+        +UUID id
+        +String name
+        +IntegrationType integrationType
+        +boolean isActive
+    }
+    class IntegrationType {
+        <<enumeration>>
+        REST_JSON
+        SOAP_XML
+        AsyncCallback
+        Batch
+    }
+    class BillerService {
+        +UUID id
+        +String name
+        +ServiceType type
+        +boolean isActive
+    }
+    class ServiceType {
+        <<enumeration>>
+        Electricity
+        Water
+        MobileTopUp
+        Internet
+    }
+    class RequiredField {
+        +String name
+        +String label
+        +String dataType
+    }
+    class BillerAdapter {
+        <<interface>>
+        +inquire(request)
+        +pay(request)
+        +queryStatus(paymentRef)
+    }
+    class ElectroCoAdapter
+    class AquaCoAdapter
+    class TopUpNetAdapter
+    class NetCoAdapter
+
+    Biller "1" --> "1..*" BillerService : offers
+    BillerService "1" --> "1..*" RequiredField : requires
+    Biller --> IntegrationType
+    BillerService --> ServiceType
+    Biller "1" --> "1" BillerAdapter : uses
+    BillerAdapter <|.. ElectroCoAdapter
+    BillerAdapter <|.. AquaCoAdapter
+    BillerAdapter <|.. TopUpNetAdapter
+    BillerAdapter <|.. NetCoAdapter
+
+    %% ============ Fees and Promotions ============
+    class FeeRule {
+        +UUID id
+        +ServiceType serviceType
+        +FeeType feeType
+        +Decimal fixedAmount
+        +Decimal percentage
+        +Decimal minimumFee
+        +Decimal threshold
+        +Decimal feeAboveThreshold
+        +calculateFee(amount)
+    }
+    class FeeType {
+        <<enumeration>>
+        Fixed
+        Percentage
+        Tiered
+    }
+    class Promotion {
+        +UUID id
+        +Date startDate
+        +Date endDate
+        +boolean isActive
+        +isApplicable(date)
+    }
+    class SystemConfiguration {
+        +Decimal basicDailyLimit
+        +Decimal verifiedDailyLimit
+        +Decimal minPayment
+        +Decimal maxPayment
+        +Decimal agentCommissionRate
+        +int velocityMaxPayments
+        +int velocityWindowSeconds
+        +int velocityBlockMinutes
+        +int billerTimeoutSeconds
+    }
+
+    BillerService "1" --> "1" FeeRule : priced by
+    Biller "1" --> "0..*" Promotion : has
+    FeeRule --> FeeType
+    SystemAdministrator ..> SystemConfiguration : edits
+    SystemAdministrator ..> Biller : manages
+    SystemAdministrator ..> Promotion : configures
+
+    %% ============ Payment ============
+    class BillInquiry {
+        +UUID id
+        +Map inputFields
+        +Decimal billAmount
+        +Decimal fee
+        +Decimal total
+        +InquiryStatus status
+        +DateTime requestedAt
+    }
+    class Payment {
+        +UUID id
+        +Decimal amount
+        +Decimal fee
+        +Decimal total
+        +PaymentState state
+        +String idempotencyKey
+        +String billerReference
+        +String failureReason
+        +DateTime createdAt
+        +transitionTo(newState)
+    }
+    class PaymentState {
+        <<enumeration>>
+        Initiated
+        FundsHeld
+        SentToBiller
+        Completed
+        Failed
+        Unknown
+        Rejected
+        Refunded
+    }
+    class PaymentStateHistory {
+        +PaymentState fromState
+        +PaymentState toState
+        +String event
+        +DateTime occurredAt
+    }
+    class IdempotencyRecord {
+        +String key
+        +String requestHash
+        +UUID paymentId
+        +DateTime createdAt
+    }
+    class RetrySchedule {
+        +int attemptNumber
+        +int delayMinutes
+        +DateTime scheduledAt
+        +RetryStatus status
+    }
+    class BillerCallback {
+        +String callbackId
+        +String payload
+        +CallbackOutcome outcome
+        +boolean isDuplicate
+        +DateTime receivedAt
+    }
+    class AgentCommission {
+        +Decimal amount
+        +DateTime creditedAt
+    }
+
+    Customer "1" --> "0..*" BillInquiry : requests
+    BillerService "1" --> "0..*" BillInquiry : for
+    Customer "1" --> "0..*" Payment : makes
+    Agent "0..1" --> "0..*" Payment : submits on behalf
+    BillerService "1" --> "0..*" Payment : pays for
+    Payment --> PaymentState
+    Payment "1" --> "1..*" PaymentStateHistory : tracks
+    Payment "1" --> "0..1" IdempotencyRecord : identified by
+    Payment "1" --> "0..3" RetrySchedule : re-queried by
+    Payment "1" --> "0..*" BillerCallback : receives
+    Payment "1" --> "0..*" LedgerEntry : generates
+    Payment "1" --> "0..1" AgentCommission : earns
+    AgentCommission "1" --> "1" LedgerEntry : credited as
+
+    %% ============ Fraud and Limits ============
+    class DailyUsage {
+        +Date date
+        +Decimal totalAmount
+    }
+    class VelocityBlock {
+        +DateTime blockedAt
+        +DateTime expiresAt
+        +isActive()
+    }
+
+    Customer "1" --> "0..*" DailyUsage : tracked by
+    Customer "1" --> "0..*" VelocityBlock : may have
+
+    %% ============ Notifications ============
+    class Notification {
+        +UUID id
+        +Channel channel
+        +String message
+        +DeliveryStatus status
+        +int retryCount
+        +DateTime sentAt
+    }
+    class Channel {
+        <<enumeration>>
+        SMS
+        Push
+        Email
+    }
+    class DeliveryStatus {
+        <<enumeration>>
+        Pending
+        Delivered
+        Undelivered
+    }
+
+    Payment "1" --> "0..*" Notification : triggers
+    Customer "1" --> "0..*" Notification : receives
+    Notification --> Channel
+    Notification --> DeliveryStatus
+
+    %% ============ Refunds ============
+    class RefundRequest {
+        +UUID id
+        +Decimal amount
+        +RefundStatus status
+        +String reason
+        +DateTime requestedAt
+        +DateTime decidedAt
+    }
+    class RefundStatus {
+        <<enumeration>>
+        Pending
+        Approved
+        Rejected
+    }
+
+    Payment "1" --> "0..*" RefundRequest : refund requested for
+    Customer "1" --> "0..*" RefundRequest : submits
+    SupportEmployee "1" --> "0..*" RefundRequest : decides
+    RefundRequest --> RefundStatus
+    RefundRequest "1" --> "0..*" LedgerEntry : separate refund entries
+
+    %% ============ Reconciliation ============
+    class SettlementFile {
+        +UUID id
+        +Date settlementDate
+        +DateTime receivedAt
+    }
+    class SettlementEntry {
+        +String billerReference
+        +Decimal amount
+        +String status
+    }
+    class ReconciliationReport {
+        +UUID id
+        +Date reportDate
+        +int matchedCount
+        +int mismatchCount
+        +int unmatchedCount
+    }
+    class Discrepancy {
+        +DiscrepancyType type
+        +String note
+        +boolean reviewed
+    }
+
+    Biller "1" --> "0..*" SettlementFile : sends
+    SettlementFile "1" --> "1..*" SettlementEntry : contains
+    SettlementFile "1" --> "1" ReconciliationReport : produces
+    ReconciliationReport "1" --> "0..*" Discrepancy : flags
+    SettlementEntry "0..1" --> "0..1" Payment : matches
+    SupportEmployee ..> Discrepancy : reviews
+
+    %% ============ Audit ============
+    class AuditLog {
+        +UUID id
+        +String actor
+        +DateTime timestamp
+        +String action
+        +String reason
+        +String details
+    }
+
+    LedgerEntry "1" --> "1" AuditLog : audited by
+    SystemAdministrator ..> AuditLog : reviews
+    SupportEmployee ..> AuditLog : generates (block/unblock)

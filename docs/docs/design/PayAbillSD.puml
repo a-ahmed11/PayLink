@@ -1,0 +1,70 @@
+@startuml
+
+autonumber
+
+actor Customer
+participant PayLink
+participant Wallet
+participant FraudChecks
+participant Biller
+participant Notification
+
+Customer -> PayLink : Confirm bill payment
+
+PayLink -> FraudChecks : Check limits, velocity, account status
+
+alt Checks failed
+    FraudChecks --> PayLink : Rejected
+    PayLink --> Customer : Payment rejected
+else Checks passed
+    FraudChecks --> PayLink : Checks passed
+
+    PayLink -> Wallet : Check available balance
+
+    alt Insufficient funds
+        Wallet --> PayLink : Insufficient funds
+        PayLink --> Customer : Payment rejected
+    else Sufficient funds
+        Wallet --> PayLink : Sufficient funds
+
+        PayLink -> Wallet : Hold total amount
+        Wallet --> PayLink : Funds held
+
+        PayLink -> Biller : Send payment request
+
+        alt Biller confirms
+            Biller --> PayLink : Payment confirmed
+
+            PayLink -> Wallet : Finalize held amount
+            Wallet --> PayLink : Charge completed
+
+            PayLink -> Notification : Send SMS and push
+            Notification --> Customer : Payment completed
+
+            PayLink --> Customer : Completed
+
+        else Biller refuses
+            Biller --> PayLink : Payment failed
+
+            PayLink -> Wallet : Release held amount
+            Wallet --> PayLink : Funds released
+
+            PayLink -> Notification : Send SMS and push
+            Notification --> Customer : Payment failed
+
+            PayLink --> Customer : Failed
+
+        else Biller timeout
+            Biller -x PayLink : No response within 10 seconds
+
+            PayLink --> Customer : Payment is being processed
+
+            note over PayLink,Wallet
+                Payment becomes Unknown
+                Funds remain held
+            end note
+        end
+    end
+end
+
+@enduml
