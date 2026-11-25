@@ -1,0 +1,123 @@
+
+@startuml "
+title PayLink - Entity Relationship Diagram
+
+hide circle
+skinparam linetype ortho
+
+entity Users {
+  * user_id : INT <<PK>>
+  --
+  name : VARCHAR
+  email : VARCHAR
+  phone : VARCHAR
+  role : VARCHAR
+  verification_level : VARCHAR
+}
+
+entity Wallets {
+  * wallet_id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  available_balance : DECIMAL
+  held_balance : DECIMAL
+}
+
+entity Billers {
+  * biller_id : INT <<PK>>
+  --
+  name : VARCHAR
+  protocol : VARCHAR
+  status : VARCHAR
+}
+
+entity Services {
+  * service_id : INT <<PK>>
+  --
+  biller_id : INT <<FK>>
+  service_name : VARCHAR
+  min_amount : DECIMAL
+  max_amount : DECIMAL
+}
+
+entity Payments {
+  * payment_id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  wallet_id : INT <<FK>>
+  service_id : INT <<FK>>
+  amount : DECIMAL
+  fee : DECIMAL
+  status : VARCHAR
+  idempotency_key : VARCHAR
+  created_at : DATETIME
+}
+
+entity WalletTransactions {
+  * transaction_id : INT <<PK>>
+  --
+  wallet_id : INT <<FK>>
+  payment_id : INT <<FK>>
+  transaction_type : VARCHAR
+  amount : DECIMAL
+  created_at : DATETIME
+}
+
+entity LedgerEntries {
+  * entry_id : INT <<PK>>
+  --
+  transaction_id : INT <<FK>>
+  entry_type : VARCHAR
+  amount : DECIMAL
+  created_at : DATETIME
+}
+
+entity PaymentHolds {
+  * hold_id : INT <<PK>>
+  --
+  payment_id : INT <<FK>>
+  wallet_id : INT <<FK>>
+  amount : DECIMAL
+  status : VARCHAR
+  created_at : DATETIME
+}
+
+entity Refunds {
+  * refund_id : INT <<PK>>
+  --
+  payment_id : INT <<FK>>
+  amount : DECIMAL
+  status : VARCHAR
+  created_at : DATETIME
+}
+
+entity Notifications {
+  * notification_id : INT <<PK>>
+  --
+  user_id : INT <<FK>>
+  payment_id : INT <<FK>>
+  channel : VARCHAR
+  status : VARCHAR
+  created_at : DATETIME
+}
+
+Users ||--|| Wallets
+Users ||--o{ Payments
+Users ||--o{ Notifications
+
+Wallets ||--o{ Payments
+Wallets ||--o{ WalletTransactions
+Wallets ||--o{ PaymentHolds
+
+Billers ||--o{ Services
+Services ||--o{ Payments
+
+Payments ||--o{ WalletTransactions
+Payments ||--o{ LedgerEntries
+Payments ||--o| PaymentHolds
+Payments ||--o| Refunds
+Payments ||--o{ Notifications
+
+WalletTransactions ||--o{ LedgerEntries
+
+@enduml
