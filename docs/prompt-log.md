@@ -193,4 +193,4 @@ Reviewed the generated User Stories to ensure they were consistent with the orig
 
 **Result:**
 
-Completed the remaining User Stories and maintained a consistent structure across the project's requirements documentation.
+Completed the remaining User Stories and maintained a consistent structure across the project's requirements documentation
