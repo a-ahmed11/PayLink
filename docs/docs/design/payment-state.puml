@@ -1,0 +1,31 @@
+
+@startuml "
+title PayLink - Payment State Diagram
+
+[*] --> Initiated
+
+Initiated --> FundsHeld : Fraud checks pass\nand sufficient balance
+Initiated --> Rejected : Fraud check fails\nor insufficient balance
+
+FundsHeld --> SentToBiller : Request sent to biller
+
+SentToBiller --> Completed : Biller confirms
+SentToBiller --> Failed : Biller refuses
+SentToBiller --> Unknown : Timeout
+
+Unknown --> Completed : Later confirmation\n(callback / retry / settlement)
+Unknown --> Failed : Later refusal\nor reconciliation confirms no payment
+
+Failed --> Refunded : Hold released to wallet
+
+Completed --> [*]
+Rejected --> [*]
+Refunded --> [*]
+
+note right of Unknown
+  Never refund automatically.
+  Wait until biller failure
+  is confirmed.
+end note
+
+@enduml

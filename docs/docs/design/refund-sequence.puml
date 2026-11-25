@@ -1,0 +1,38 @@
+
+@startuml "
+title PayLink - Refund a Failed Payment
+
+actor Customer
+participant "Payment API" as API
+participant "Payment Processing" as PP
+participant "Biller Adapter" as Adapter
+participant Biller
+participant Wallet
+participant Ledger
+participant "Notification Service" as NS
+
+Customer -> API : Check payment status
+API -> PP : Get payment(paymentId)
+PP -> Adapter : Check payment result
+Adapter -> Biller : Query payment status
+Biller --> Adapter : Payment failed
+Adapter --> PP : Confirmed failure
+
+PP -> PP : Validate failure
+PP -> PP : Change status to Failed
+
+PP -> Wallet : Release held amount
+Wallet -> Wallet : Move amount to available balance
+Wallet -> Ledger : Record release transaction
+Ledger --> Wallet : Transaction recorded
+
+Wallet --> PP : Hold released successfully
+PP -> PP : Change status to Refunded
+
+PP -> NS : Send refund notification
+NS --> Customer : Refund confirmation
+
+PP --> API : Return Refunded status
+API --> Customer : Display refund result
+
+@enduml
